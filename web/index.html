@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test Agent — AI 测试用例生成</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   CSS Variables — 设计系统
+   ═══════════════════════════════════════════ */
+:root {
+  --bg-deep: #08080a;
+  --bg-base: #0e0e11;
+  --bg-surface: #16161a;
+  --bg-elevated: #1c1c21;
+  --bg-hover: #222228;
+
+  --text-primary: #ededef;
+  --text-secondary: #8b8b96;
+  --text-tertiary: #55555f;
+
+  --accent: #c084fc;
+  --accent-soft: rgba(192, 132, 252, 0.12);
+  --accent-medium: rgba(192, 132, 252, 0.25);
+
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.12);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.12);
+  --error: #f87171;
+  --error-soft: rgba(248, 113, 113, 0.12);
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.1);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --font-sans: 'Geist', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --sidebar-w: 280px;
+  --header-h: 56px;
+  --composer-h: 120px;
+}
+
+/* ═══════════════════════════════════════════
+   Reset & Base
+   ═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 15px; -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+}
+
+::selection { background: var(--accent-medium); color: var(--text-primary); }
+
+/* ═══════════════════════════════════════════
+   Sidebar
+   ═══════════════════════════════════════════ */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  height: 100vh;
+  background: var(--bg-base);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 20;
+}
+
+.sidebar-header {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000;
+}
+
+.btn-new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-new:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.sidebar-list::-webkit-scrollbar { width: 4px; }
+.sidebar-list::-webkit-scrollbar-track { background: transparent; }
+.sidebar-list::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 2px; }
+
+.conv-item {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 2px;
+}
+.conv-item:hover { background: var(--bg-elevated); }
+.conv-item.active { background: var(--bg-elevated); border: 1px solid var(--border); }
+.conv-item-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conv-item-meta {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ═══════════════════════════════════════════
+   Main Area
+   ═══════════════════════════════════════════ */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-width: 0;
+}
+
+.main-header {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(8, 8, 10, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-toggle-sidebar {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.header-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.header-badge {
+  padding: 2px 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-icon {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-icon:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+/* ═══════════════════════════════════════════
+   Message Stream
+   ═══════════════════════════════════════════ */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 0;
+  scroll-behavior: smooth;
+}
+
+.messages::-webkit-scrollbar { width: 6px; }
+.messages::-webkit-scrollbar-track { background: transparent; }
+.messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.messages::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+
+.messages-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* Welcome state */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 60px 32px;
+  text-align: center;
+  animation: fadeIn 0.6s ease;
+}
+
+.welcome-icon {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 24px;
+  box-shadow: 0 0 40px rgba(192, 132, 252, 0.2);
+}
+
+.welcome h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+
+.welcome p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  max-width: 400px;
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-width: 460px;
+  width: 100%;
+}
+
+.quick-action {
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-sans);
+}
+.quick-action:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+.quick-action-icon {
+  font-size: 1.1rem;
+  margin-bottom: 6px;
+}
+.quick-action-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Message bubbles */
+.msg {
+  margin-bottom: 24px;
+  animation: msgIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.msg-user {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.msg-user .msg-bubble {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+  padding: 14px 18px;
+  max-width: 85%;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.msg-assistant .msg-bubble {
+  padding: 4px 0;
+  max-width: 100%;
+}
+
+.msg-assistant .msg-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.msg-assistant .msg-label-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.msg-content {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.msg-content h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.msg-content p { margin-bottom: 10px; }
+
+/* Pipeline steps */
+.pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 12px 0;
+}
+
+.pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  transition: all 0.3s;
+}
+
+.pipeline-step.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pipeline-step.done {
+  color: var(--success);
+}
+
+.pipeline-step .step-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  border: 1.5px solid currentColor;
+}
+
+.pipeline-step.active .step-icon {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+}
+
+.pipeline-step.done .step-icon {
+  background: var(--success-soft);
+  border-color: var(--success);
+}
+
+.pipeline-step .step-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.pipeline-step .step-label { flex: 1; }
+.pipeline-step .step-detail {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  opacity: 0.7;
+}
+
+/* Tables */
+.test-table-wrap {
+  overflow-x: auto;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.test-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.test-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.test-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.test-table tr:last-child td { border-bottom: none; }
+.test-table tr:hover td { background: var(--bg-surface); }
+
+.test-table .cell-id {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.test-table .cell-title {
+  color: var(--text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.tag-P0 { background: var(--error-soft); color: var(--error); }
+.tag-P1 { background: var(--warning-soft); color: var(--warning); }
+.tag-P2 { background: rgba(96, 165, 250, 0.12); color: #60a5fa; }
+.tag-P3 { background: rgba(148, 163, 184, 0.12); color: #94a3b8; }
+.tag-type { background: var(--accent-soft); color: var(--accent); }
+
+/* Summary cards */
+.summary-row {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.summary-card {
+  flex: 1;
+  min-width: 120px;
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.summary-card-label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.summary-card-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.summary-card-value.text-accent { color: var(--accent); }
+.summary-card-value.text-success { color: var(--success); }
+
+/* ═══════════════════════════════════════════
+   Composer
+   ═══════════════════════════════════════════ */
+.composer-wrap {
+  padding: 0 24px 24px;
+}
+
+.composer {
+  max-width: 780px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.composer-box {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.2s;
+}
+
+.composer-box:focus-within {
+  border-color: var(--accent-medium);
+}
+
+.composer-box textarea {
+  width: 100%;
+  min-height: 52px;
+  max-height: 200px;
+  padding: 16px 18px 8px;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: none;
+}
+
+.composer-box textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 10px;
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-composer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-composer:hover {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.btn-send {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #000;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-send:hover {
+  background: #d4a0ff;
+  transform: scale(1.05);
+}
+.btn-send:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.composer-hint {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+
+/* ═══════════════════════════════════════════
+   Animations
+   ═══════════════════════════════════════════ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.typing-indicator span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--text-tertiary);
+  border-radius: 50%;
+  margin: 0 2px;
+  animation: pulse 1.2s infinite;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+/* Module section headers */
+.module-section {
+  margin: 20px 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* Coverage bar */
+.coverage-bar-wrap {
+  margin: 8px 0;
+}
+.coverage-bar-bg {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.coverage-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), #a855f7);
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ═══════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    transform: translateX(-100%);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .btn-toggle-sidebar { display: flex; }
+  .messages-inner { padding: 0 16px; }
+  .composer-wrap { padding: 0 12px 16px; }
+  .quick-actions { grid-template-columns: 1fr; }
+  .summary-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ Sidebar ══════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon">T</div>
+      <span>Test Agent</span>
+    </div>
+    <button class="btn-new" onclick="newConversation()">+ 新对话</button>
+  </div>
+  <div class="sidebar-list" id="sidebarList">
+    <!-- conversation items rendered by JS -->
+  </div>
+  <div class="sidebar-footer">
+    <span style="color:var(--success)">●</span> DeepSeek V4 已连接
+  </div>
+</aside>
+
+<!-- ══════════════ Main ══════════════ -->
+<div class="main">
+  <header class="main-header">
+    <div class="header-left">
+      <button class="btn-toggle-sidebar" onclick="toggleSidebar()">☰</button>
+      <span class="header-title" id="headerTitle">新的测试用例</span>
+      <span class="header-badge">MVP v0.1</span>
+    </div>
+    <div class="header-right">
+      <button class="btn-icon" title="设置" onclick="showToast('设置功能开发中')">⚙</button>
+    </div>
+  </header>
+
+  <div class="messages" id="messages">
+    <div class="messages-inner" id="messagesInner">
+      <!-- Welcome or messages rendered by JS -->
+    </div>
+  </div>
+
+  <div class="composer-wrap">
+    <div class="composer">
+      <div class="composer-box">
+        <textarea id="inputArea" placeholder="粘贴 PRD 文档，或描述你的测试需求..." rows="2"></textarea>
+        <div class="composer-toolbar">
+          <div class="composer-actions">
+            <button class="btn-composer" onclick="document.getElementById('inputArea').value=samplePRD; autoResize();">
+              📋 示例 PRD
+            </button>
+            <button class="btn-composer" onclick="showToast('文件上传功能开发中')">
+              📎 上传文件
+            </button>
+          </div>
+          <button class="btn-send" id="btnSend" onclick="handleSend()">↑</button>
+        </div>
+      </div>
+      <div class="composer-hint">Enter 发送 · Shift+Enter 换行</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════
+let conversations = [];
+let currentConvId = null;
+let isGenerating = false;
+
+// ═══════════════════════════════════════════
+// Sample PRD
+// ═══════════════════════════════════════════
+const samplePRD = `# PRD: 购物车拼团功能
+
+## 1. 功能概述
+在购物车中新增拼团功能，用户可以发起拼团或参与他人拼团，享受优惠价格。
+
+## 2. 功能需求
+
+### 2.1 发起拼团
+- 用户在商品详情页或购物车可以选择「发起拼团」
+- 选择拼团人数（2人团、3人团、5人团），不同人数对应不同优惠力度
+- 发起拼团后生成分享链接
+- 拼团有效期24小时，超时未成团自动取消并退款
+
+### 2.2 参与拼团
+- 通过拼团链接进入详情页，点击「参与拼团」
+- 拼团人数满后自动成团，触发订单创建
+
+### 2.3 购物车中的拼团商品
+- 支持同时存在普通商品和拼团商品
+- 拼团商品和普通商品可合并结算，拼团商品单独计算优惠
+
+### 2.4 拼团订单
+- 拼团成功后每个参与者各自创建独立订单
+- 支持退款，退款后该用户退出拼团
+- 如果退款导致人数不足，整个拼团自动取消
+
+## 3. 业务规则
+- 同一用户同一商品只能参与一个进行中的拼团
+- 拼团商品不与其他优惠券叠加
+- 拼团价低于成本价时系统自动拒绝发起`;
+
+// ═══════════════════════════════════════════
+// Sample generated test cases (simulated)
+// ═══════════════════════════════════════════
+const sampleTestCases = [
+  { id:"TC-001", module:"发起拼团", title:"验证选择2人团成功发起拼团", type:"正向", priority:"P0", pre:"用户已登录，商品支持拼团", steps:"进入商品详情页 → 点击「发起拼团」→ 选择2人团 → 确认", expected:"拼团创建成功，生成分享链接" },
+  { id:"TC-002", module:"发起拼团", title:"验证选择5人团优惠力度最大", type:"正向", priority:"P1", pre:"用户已登录", steps:"进入拼团页 → 分别查看2/3/5人团价格", expected:"5人团价格最低，优惠力度递增" },
+  { id:"TC-003", module:"发起拼团", title:"验证未登录用户点击发起拼团", type:"逆向", priority:"P1", pre:"用户未登录", steps:"进入商品详情页 → 点击「发起拼团」", expected:"跳转登录页，登录后返回拼团页" },
+  { id:"TC-004", module:"发起拼团", title:"验证拼团24小时超时自动取消", type:"异常", priority:"P0", pre:"拼团已发起23小时59分", steps:"等待1分钟 → 刷新拼团状态", expected:"拼团状态变为「已取消」，自动退款" },
+  { id:"TC-005", module:"参与拼团", title:"验证通过分享链接参与拼团", type:"正向", priority:"P0", pre:"已有进行中的拼团", steps:"打开拼团链接 → 点击「参与拼团」→ 确认订单", expected:"成功加入拼团，人数+1" },
+  { id:"TC-006", module:"参与拼团", title:"验证拼团人数满后自动成团", type:"正向", priority:"P0", pre:"2人团已有1人", steps:"第2个用户点击参与拼团", expected:"拼团自动成团，所有参与者收到订单" },
+  { id:"TC-007", module:"参与拼团", title:"验证同一用户重复参与同一拼团", type:"逆向", priority:"P1", pre:"用户已参与该拼团", steps:"再次点击同一拼团链接", expected:"提示「您已参与该拼团」" },
+  { id:"TC-008", module:"购物车", title:"验证购物车同时存在普通商品和拼团商品", type:"正向", priority:"P1", pre:"购物车有普通商品", steps:"发起拼团 → 返回购物车", expected:"购物车显示普通商品和拼团商品，拼团商品标注拼团价" },
+  { id:"TC-009", module:"购物车", title:"验证拼团商品不与其他优惠券叠加", type:"边界", priority:"P1", pre:"用户有可用优惠券", steps:"购物车含拼团商品 → 尝试使用优惠券", expected:"提示拼团商品不可使用优惠券" },
+  { id:"TC-010", module:"拼团订单", title:"验证退款后退出拼团", type:"逆向", priority:"P0", pre:"拼团已成功，订单已支付", steps:"申请退款 → 审核通过", expected:"用户退出拼团，退款到账" },
+  { id:"TC-011", module:"拼团订单", title:"验证退款导致拼团人数不足自动取消", type:"异常", priority:"P0", pre:"2人团已满员，1人退款", steps:"参与者A申请退款", expected:"拼团人数不足，整个拼团取消，所有参与者退款" },
+  { id:"TC-012", module:"拼团订单", title:"验证拼团价低于成本价被拒绝", type:"边界", priority:"P1", pre:"商品拼团价低于成本价", steps:"尝试发起拼团", expected:"系统拒绝发起，提示价格异常" },
+  { id:"TC-013", module:"发起拼团", title:"验证并发发起拼团不超卖", type:"安全", priority:"P0", pre:"商品库存仅剩1件", steps:"100个用户同时发起拼团", expected:"仅1个拼团成功，其余提示库存不足" },
+  { id:"TC-014", module:"参与拼团", title:"验证已结束的拼团不可参与", type:"逆向", priority:"P2", pre:"拼团已成功结束", steps:"点击已结束拼团的分享链接", expected:"提示「该拼团已结束」" },
+];
+
+// ═══════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════
+function init() {
+  renderWelcome();
+  renderSidebar();
+
+  // textarea auto-resize & shortcuts
+  const ta = document.getElementById('inputArea');
+  ta.addEventListener('input', autoResize);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  });
+}
+
+function autoResize() {
+  const ta = document.getElementById('inputArea');
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+}
+
+// ═══════════════════════════════════════════
+// Render
+// ═══════════════════════════════════════════
+function renderWelcome() {
+  document.getElementById('messagesInner').innerHTML = `
+    <div class="welcome">
+      <div class="welcome-icon">T</div>
+      <h1>Test Agent</h1>
+      <p>粘贴 PRD 文档，AI 自动生成完整的测试用例。覆盖正向、逆向、边界、异常场景。</p>
+      <div class="quick-actions">
+        <div class="quick-action" onclick="document.getElementById('inputArea').value=samplePRD;autoResize();">
+          <div class="quick-action-icon">📋</div>
+          <div class="quick-action-text">加载示例 PRD 并生成测试用例</div>
+        </div>
+        <div class="quick-action" onclick="document.getElementById('inputArea').value='请根据以下需求生成测试用例：\\n\\n用户注册功能：\\n1. 支持手机号注册\\n2. 支持邮箱注册\\n3. 密码要求8-20位，包含大小写字母和数字\\n4. 注册成功自动登录';autoResize();">
+          <div class="quick-action-icon">✍️</div>
+          <div class="quick-action-text">简单需求，快速生成</div>
+        </div>
+        <div class="quick-action" onclick="showToast('导入功能开发中')">
+          <div class="quick-action-icon">📂</div>
+          <div class="quick-action-text">导入飞书/Confluence PRD</div>
+        </div>
+        <div class="quick-action" onclick="showToast('历史功能开发中')">
+          <div class="quick-action-icon">📚</div>
+          <div class="quick-action-text">查看历史生成记录</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSidebar() {
+  const list = document.getElementById('sidebarList');
+  if (conversations.length === 0) {
+    list.innerHTML = `<div style="padding:20px 12px;text-align:center;color:var(--text-tertiary);font-size:0.8rem;">暂无对话记录</div>`;
+    return;
+  }
+  list.innerHTML = conversations.map(c => `
+    <div class="conv-item ${c.id === currentConvId ? 'active' : ''}" onclick="switchConv('${c.id}')">
+      <div class="conv-item-title">${c.title}</div>
+      <div class="conv-item-meta">${c.time} · ${c.caseCount} 条用例</div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════
+// Actions
+// ═══════════════════════════════════════════
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+function newConversation() {
+  currentConvId = null;
+  renderWelcome();
+  renderSidebar();
+  document.getElementById('headerTitle').textContent = '新的测试用例';
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+function switchConv(id) {
+  currentConvId = id;
+  const conv = conversations.find(c => c.id === id);
+  if (conv) {
+    document.getElementById('headerTitle').textContent = conv.title;
+    renderMessages(conv.messages);
+  }
+  renderSidebar();
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+function renderMessages(msgs) {
+  const inner = document.getElementById('messagesInner');
+  inner.innerHTML = msgs.map(m => m.html).join('');
+  scrollToBottom();
+}
+
+async function handleSend() {
+  const ta = document.getElementById('inputArea');
+  const text = ta.value.trim();
+  if (!text || isGenerating) return;
+
+  isGenerating = true;
+  document.getElementById('btnSend').disabled = true;
+
+  const convId = 'conv-' + Date.now();
+  currentConvId = convId;
+  const title = text.slice(0, 30).replace(/[#\n]/g, ' ').trim() + (text.length > 30 ? '...' : '');
+  document.getElementById('headerTitle').textContent = title;
+
+  // Show user message + pipeline
+  const inner = document.getElementById('messagesInner');
+  inner.innerHTML = `<div class="msg msg-user"><div class="msg-bubble">${escapeHtml(text)}</div></div>`;
+  inner.innerHTML += renderPipelineHTML();
+  scrollToBottom();
+
+  try {
+    // 调用真实 API
+    const result = await callGenerateAPI(text);
+
+    // 渲染真实结果
+    const resultsHTML = renderRealResults(result.analysis, result.cases, result.review);
+    inner.innerHTML += resultsHTML;
+    scrollToBottom();
+
+    // 保存对话
+    conversations.unshift({
+      id: convId,
+      title,
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      caseCount: result.cases.length,
+      messages: [
+        { html: `<div class="msg msg-user"><div class="msg-bubble">${escapeHtml(text)}</div></div>` },
+        { html: resultsHTML },
+      ],
+    });
+    renderSidebar();
+  } catch (err) {
+    inner.innerHTML += `
+      <div class="msg msg-assistant" style="animation:msgIn 0.4s ease">
+        <div class="msg-bubble">
+          <div style="color:var(--error);padding:12px;font-size:0.85rem;">
+            ❌ 生成失败：${escapeHtml(err.message || String(err))}
+            <br><br>
+            <button class="btn-new" onclick="handleSendRetry()">重试</button>
+          </div>
+        </div>
+      </div>`;
+    scrollToBottom();
+  }
+
+  ta.value = '';
+  ta.style.height = 'auto';
+  isGenerating = false;
+  document.getElementById('btnSend').disabled = false;
+}
+
+function handleSendRetry() {
+  // 重试时不重新读取输入框（已清空），用上一次的 PRD
+  const lastConv = conversations[0];
+  if (lastConv) {
+    isGenerating = false;
+    document.getElementById('btnSend').disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════
+// Pipeline Animation
+// ═══════════════════════════════════════════
+function renderPipelineHTML() {
+  return `
+  <div class="msg msg-assistant">
+    <div class="msg-bubble">
+      <div class="msg-label"><span class="msg-label-dot"></span>Test Agent</div>
+      <div class="pipeline" id="pipeline">
+        <div class="pipeline-step active" id="step-0">
+          <div class="step-icon">1</div>
+          <span class="step-label">需求分析</span>
+          <div class="step-spinner" id="spinner-0"></div>
+          <span class="step-detail" id="detail-0"></span>
+        </div>
+        <div class="pipeline-step" id="step-1">
+          <div class="step-icon">2</div>
+          <span class="step-label">生成测试用例</span>
+          <div class="step-spinner" id="spinner-1" style="display:none"></div>
+          <span class="step-detail" id="detail-1"></span>
+        </div>
+        <div class="pipeline-step" id="step-2">
+          <div class="step-icon">3</div>
+          <span class="step-label">质量审核</span>
+          <div class="step-spinner" id="spinner-2" style="display:none"></div>
+          <span class="step-detail" id="detail-2"></span>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════
+// Real API Call (SSE streaming)
+// ═══════════════════════════════════════════
+async function callGenerateAPI(prdText) {
+  return new Promise((resolve, reject) => {
+    const es = new EventSource('/api/generate?' + new URLSearchParams({ prd: prdText }));
+
+    // 由于 SSE 不支持 POST body，改用 fetch + 读流
+    es.close();
+
+    fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prd: prdText }),
+    }).then(async (response) => {
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: '请求失败' }));
+        reject(new Error(err.error || '请求失败'));
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const result = { analysis: null, cases: [], review: null };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            var eventType = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+
+            if (eventType === 'step') {
+              updatePipelineStep(data);
+            } else if (eventType === 'done') {
+              result.analysis = data.analysis;
+              result.cases = data.cases;
+              result.review = data.review;
+            } else if (eventType === 'error') {
+              reject(new Error(data.message));
+              return;
+            }
+          }
+        }
+      }
+
+      resolve(result);
+    }).catch(reject);
+  });
+}
+
+function updatePipelineStep(data) {
+  const { step, status, detail } = data;
+  const stepEl = document.getElementById(`step-${step}`);
+  const spinnerEl = document.getElementById(`spinner-${step}`);
+  const detailEl = document.getElementById(`detail-${step}`);
+
+  if (status === 'running') {
+    stepEl.classList.add('active');
+    spinnerEl.style.display = 'block';
+    // 激活下一步的 spinner
+    if (step < 2) {
+      // 当前步骤正在跑
+    }
+  } else if (status === 'done') {
+    stepEl.classList.remove('active');
+    stepEl.classList.add('done');
+    spinnerEl.style.display = 'none';
+    detailEl.textContent = detail;
+    stepEl.querySelector('.step-icon').textContent = '✓';
+    // 激活下一步
+    if (step < 2) {
+      const nextStep = document.getElementById(`step-${step + 1}`);
+      const nextSpinner = document.getElementById(`spinner-${step + 1}`);
+      nextStep.classList.add('active');
+      nextSpinner.style.display = 'block';
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// Results Rendering (真实数据)
+// ═══════════════════════════════════════════
+let lastGeneratedCases = []; // 保存最后生成的用例，供导出使用
+
+function renderRealResults(analysis, cases, review) {
+  lastGeneratedCases = cases || [];
+  const modules = [...new Set((cases || []).map(c => c.module))];
+  const p0Count = (cases || []).filter(c => c.priority === 'P0').length;
+  const coverageScore = review?.coverageScore ? Math.round(review.coverageScore * 100) : 0;
+
+  let html = `
+  <div class="msg msg-assistant" style="animation:msgIn 0.4s cubic-bezier(0.16,1,0.3,1)">
+    <div class="msg-bubble">
+      <div class="msg-label"><span class="msg-label-dot"></span>Test Agent · 生成完成</div>
+
+      <div class="summary-row">
+        <div class="summary-card">
+          <div class="summary-card-label">功能点</div>
+          <div class="summary-card-value text-accent">${analysis?.features?.length || 0}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card-label">测试用例</div>
+          <div class="summary-card-value">${cases?.length || 0}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card-label">P0 冒烟</div>
+          <div class="summary-card-value" style="color:var(--error)">${p0Count}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-card-label">覆盖率</div>
+          <div class="summary-card-value text-success">${coverageScore}%</div>
+        </div>
+      </div>
+
+      <div class="coverage-bar-wrap">
+        <div class="coverage-bar-bg">
+          <div class="coverage-bar-fill" style="width:${coverageScore}%"></div>
+        </div>
+      </div>`;
+
+  // 按模块分组渲染表格
+  for (const mod of modules) {
+    const modCases = cases.filter(c => c.module === mod);
+    html += `<div class="module-section">${escapeHtml(mod)}（${modCases.length} 条）</div>`;
+    html += `<div class="test-table-wrap"><table class="test-table">
+      <thead><tr><th>编号</th><th>标题</th><th>类型</th><th>优先级</th><th>前置条件</th><th>预期结果</th></tr></thead><tbody>`;
+    for (const c of modCases) {
+      const steps = (c.steps || []).map((s, i) => `${i + 1}. ${s}`).join('; ');
+      html += `<tr>
+        <td class="cell-id">${escapeHtml(c.id)}</td>
+        <td class="cell-title">${escapeHtml(c.title)}</td>
+        <td><span class="tag tag-type">${escapeHtml(c.caseType || c.type || '')}</span></td>
+        <td><span class="tag tag-${c.priority}">${c.priority}</span></td>
+        <td>${escapeHtml(c.precondition || c.pre || '')}</td>
+        <td>${escapeHtml(c.expected)}</td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>`;
+  }
+
+  // 审核遗漏
+  if (review?.missingScenarios?.length) {
+    html += `<div style="margin-top:16px;font-size:0.82rem;color:var(--warning);">`;
+    html += `<strong>⚠ 遗漏场景：</strong>`;
+    for (const s of review.missingScenarios) {
+      html += `<br>- ${escapeHtml(s)}`;
+    }
+    html += `</div>`;
+  }
+
+  html += `
+      <div style="margin-top:16px;display:flex;gap:8px;">
+        <button class="btn-new" onclick="exportResult('markdown')">📄 导出 Markdown</button>
+        <button class="btn-new" onclick="exportResult('json')">📦 导出 JSON</button>
+        <button class="btn-new" onclick="exportResult('table')">📊 复制表格</button>
+      </div>
+    </div>
+  </div>`;
+
+  return html;
+}
+
+// ═══════════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════════
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function scrollToBottom() {
+  const el = document.getElementById('messages');
+  requestAnimationFrame(() => el.scrollTop = el.scrollHeight);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showToast(msg) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-secondary);padding:10px 20px;border-radius:8px;font-size:0.82rem;z-index:999;animation:msgIn 0.3s ease';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
+function exportResult(format) {
+  const cases = lastGeneratedCases;
+  let text = '';
+  if (format === 'json') {
+    text = JSON.stringify(cases, null, 2);
+  } else if (format === 'markdown') {
+    text = '# 测试用例报告\n\n';
+    const modules = [...new Set(cases.map(c => c.module))];
+    for (const mod of modules) {
+      const modCases = cases.filter(c => c.module === mod);
+      text += `## ${mod}\n\n| 编号 | 标题 | 类型 | 优先级 | 前置条件 | 预期结果 |\n|------|------|------|--------|----------|----------|\n`;
+      for (const c of modCases) {
+        text += `| ${c.id} | ${c.title} | ${c.caseType || c.type} | ${c.priority} | ${c.precondition || c.pre} | ${c.expected} |\n`;
+      }
+      text += '\n';
+    }
+  } else {
+    text = cases.map(c =>
+      `${c.id}\t${c.module}\t${c.title}\t${c.caseType || c.type}\t${c.priority}\t${c.precondition || c.pre}\t${c.expected}`
+    ).join('\n');
+  }
+
+  navigator.clipboard.writeText(text).then(() => {
+    showToast(`已复制 ${format.toUpperCase()} 到剪贴板`);
+  }).catch(() => {
+    showToast('复制失败，请手动选择');
+  });
+}
+
+// Boot
+init();
+</script>
+</body>
+</html>

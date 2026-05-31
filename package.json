@@ -1,0 +1,32 @@
+{
+  "name": "test-agent",
+  "version": "0.1.0",
+  "description": "AI Agent for generating test cases from PRD documents",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "test-agent": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "chalk": "^5.4.0",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.0",
+    "express": "^5.2.1",
+    "openai": "^4.80.0",
+    "ora": "^8.1.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
