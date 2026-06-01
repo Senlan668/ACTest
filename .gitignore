@@ -33,9 +33,28 @@ npm-debug.log*
 # Test coverage
 coverage/
 
-# ChromaDB data
+# Vitest
+.vitest/
+
+# ChromaDB / vector store (runtime data)
 data/chroma/
 
 # Temp files
 tmp/
 temp/
+
+# Cursor Playwright MCP snapshots
+.playwright-mcp/
+
+# Playwright (if added later)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Agent / manual UI debug screenshots (repo root only)
+/*.png
+
+# CLI / web export artifacts (user-specified paths)
+*.xlsx
+output/

@@ -6,6 +6,7 @@
 <title>Test Agent — AI 测试用例生成</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js" defer></script>
 <style>
 /* ═══════════════════════════════════════════
    CSS Variables — 设计系统
@@ -42,7 +43,6 @@
   --font-sans: 'Geist', -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  --sidebar-w: 280px;
   --header-h: 56px;
   --composer-h: 120px;
 }
@@ -66,49 +66,94 @@ body {
 ::selection { background: var(--accent-medium); color: var(--text-primary); }
 
 /* ═══════════════════════════════════════════
-   Sidebar
+   Activity Bar (左导航)
    ═══════════════════════════════════════════ */
-.sidebar {
-  width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
+.activity-bar {
+  width: 72px;
+  min-width: 72px;
   height: 100vh;
   background: var(--bg-base);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center;
   z-index: 20;
 }
 
-.sidebar-header {
+.activity-bar-top {
   height: var(--header-h);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
+  justify-content: center;
   border-bottom: 1px solid var(--border);
+  width: 100%;
 }
 
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: -0.02em;
-}
-
-.logo-icon {
-  width: 28px;
-  height: 28px;
+.activity-logo {
+  width: 32px;
+  height: 32px;
   background: linear-gradient(135deg, var(--accent), #a855f7);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: #000;
+}
+
+.activity-bar-items {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  gap: 2px;
+}
+
+.activity-bar-bottom {
+  padding: 8px 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.activity-item {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 1.15rem;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.activity-item:hover {
+  background: var(--bg-hover);
+}
+
+.activity-item.active {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.activity-label {
+  font-size: 0.6rem;
+  font-family: var(--font-sans);
+  color: var(--text-tertiary);
+  line-height: 1;
+}
+
+.activity-item.active .activity-label {
+  color: var(--accent);
 }
 
 .btn-new {
@@ -131,15 +176,54 @@ body {
   border-color: var(--border-hover);
 }
 
-.sidebar-list {
+/* ═══════════════════════════════════════════
+   History Panel (右侧历史对话)
+   ═══════════════════════════════════════════ */
+.history-panel {
+  width: 240px;
+  min-width: 240px;
+  height: 100vh;
+  background: var(--bg-base);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 15;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.history-panel.collapsed {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-left: none;
+}
+
+.history-header {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.history-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.history-list {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
 }
 
-.sidebar-list::-webkit-scrollbar { width: 4px; }
-.sidebar-list::-webkit-scrollbar-track { background: transparent; }
-.sidebar-list::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 2px; }
+.history-list::-webkit-scrollbar { width: 4px; }
+.history-list::-webkit-scrollbar-track { background: transparent; }
+.history-list::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 2px; }
 
 .conv-item {
   padding: 10px 12px;
@@ -164,7 +248,7 @@ body {
   margin-top: 3px;
 }
 
-.sidebar-footer {
+.history-footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   font-size: 0.72rem;
@@ -172,6 +256,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 /* ═══════════════════════════════════════════
@@ -749,52 +834,254 @@ body {
    Responsive
    ═══════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .sidebar {
+  .history-panel {
     position: fixed;
-    left: 0;
+    right: 0;
     top: 0;
-    transform: translateX(-100%);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 25;
   }
-  .sidebar.open { transform: translateX(0); }
+  .history-panel.open { transform: translateX(0); }
+  .history-panel.collapsed { width: 0; min-width: 0; }
   .btn-toggle-sidebar { display: flex; }
+  .history-toggle-btn { display: none; }
   .messages-inner { padding: 0 16px; }
   .composer-wrap { padding: 0 12px 16px; }
   .quick-actions { grid-template-columns: 1fr; }
   .summary-row { flex-direction: column; }
 }
+
+/* ═══════════════════════════════════════════
+   Cases View — 测试用例面板
+   ═══════════════════════════════════════════ */
+.cases-view {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cases-view.active { display: flex; }
+
+.cases-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0 24px;
+}
+
+.cases-tab {
+  padding: 12px 16px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+
+.cases-tab:hover { color: var(--text-secondary); }
+.cases-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.cases-filter-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 24px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+.filter-select {
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.filter-select:focus {
+  border-color: var(--accent-medium);
+}
+
+.filter-count {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.cases-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+.cases-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.cases-table-wrap .test-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.cases-table-wrap .test-table th.sortable::after {
+  content: '⇅';
+  margin-left: 4px;
+  font-size: 0.6rem;
+  opacity: 0.4;
+}
+
+.cases-table-wrap .test-table th.sortable.asc::after {
+  content: '↑';
+  opacity: 0.8;
+  color: var(--accent);
+}
+
+.cases-table-wrap .test-table th.sortable.desc::after {
+  content: '↓';
+  opacity: 0.8;
+  color: var(--accent);
+}
+
+
+
+.cases-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-tertiary);
+  gap: 12px;
+}
+
+.cases-empty-icon {
+  font-size: 3rem;
+  opacity: 0.4;
+}
+
+.cases-empty-text {
+  font-size: 0.9rem;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.pagination button {
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+}
+
+.pagination button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.pagination button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-medium);
+}
+
+.pagination button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  padding: 0 8px;
+}
+
+.cases-footer {
+  padding: 12px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cases-footer .btn-new {
+  flex: 1;
+  text-align: center;
+  font-size: 0.82rem;
+  max-width: 200px;
+}
 </style>
 </head>
 <body>
 
-<!-- ══════════════ Sidebar ══════════════ -->
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-header">
-    <div class="logo">
-      <div class="logo-icon">T</div>
-      <span>Test Agent</span>
-    </div>
-    <button class="btn-new" onclick="newConversation()">+ 新对话</button>
+<!-- ══════════════ Activity Bar (左导航) ══════════════ -->
+<nav class="activity-bar" id="activityBar">
+  <div class="activity-bar-top">
+    <div class="activity-logo">T</div>
   </div>
-  <div class="sidebar-list" id="sidebarList">
-    <!-- conversation items rendered by JS -->
+  <div class="activity-bar-items">
+    <button class="activity-item active" data-view="chat" onclick="switchView('chat')" title="AI 对话">💬<span class="activity-label">对话</span></button>
+    <button class="activity-item" data-view="cases" onclick="switchView('cases')" title="测试用例">📊<span class="activity-label">用例</span></button>
   </div>
-  <div class="sidebar-footer">
-    <span style="color:var(--success)">●</span> DeepSeek V4 已连接
+  <div class="activity-bar-bottom">
+    <button class="activity-item" onclick="showToast('设置功能开发中')" title="设置">⚙<span class="activity-label">设置</span></button>
   </div>
-</aside>
+</nav>
 
 <!-- ══════════════ Main ══════════════ -->
 <div class="main">
   <header class="main-header">
     <div class="header-left">
-      <button class="btn-toggle-sidebar" onclick="toggleSidebar()">☰</button>
+      <button class="btn-toggle-sidebar" onclick="toggleHistory()">☰</button>
       <span class="header-title" id="headerTitle">新的测试用例</span>
       <span class="header-badge">MVP v0.1</span>
     </div>
     <div class="header-right">
+      <button class="btn-icon history-toggle-btn" id="historyToggleBtn" title="对话记录" onclick="toggleHistory()">></button>
       <button class="btn-icon" title="设置" onclick="showToast('设置功能开发中')">⚙</button>
     </div>
   </header>
+
+  <!-- ══════════════ Cases View ══════════════ -->
+  <div class="cases-view" id="casesView">
+    <div class="cases-tabs" id="casesTabs">
+      <button class="cases-tab active">📊 测试用例</button>
+    </div>
+    <div class="cases-filter-bar" id="casesFilterBar"></div>
+    <div class="cases-content" id="casesContent"></div>
+    <div class="cases-footer" id="casesFooter">
+      <button class="btn-new" onclick="downloadXlsx()">📥 下载 Excel</button>
+      <button class="btn-new" onclick="downloadMarkdown()">📄 下载 Markdown</button>
+    </div>
+  </div>
 
   <div class="messages" id="messages">
     <div class="messages-inner" id="messagesInner">
@@ -823,6 +1110,20 @@ body {
   </div>
 </div>
 
+<!-- ══════════════ History Panel (右侧历史对话) ══════════════ -->
+<aside class="history-panel" id="historyPanel">
+  <div class="history-header">
+    <span class="history-title">对话记录</span>
+    <button class="btn-new" onclick="newConversation()">+</button>
+  </div>
+  <div class="history-list" id="historyList">
+    <!-- conversation items rendered by JS -->
+  </div>
+  <div class="history-footer">
+    <span style="color:var(--success)">●</span> DeepSeek V4 已连接
+  </div>
+</aside>
+
 <script>
 // ═══════════════════════════════════════════
 // State
@@ -830,6 +1131,13 @@ body {
 let conversations = [];
 let currentConvId = null;
 let isGenerating = false;
+
+// Panel state
+let currentView = 'chat'; // 'chat' | 'cases'
+let panelFilters = { module: '', priority: '', type: '' };
+let panelSort = { key: 'id', dir: 'asc' };
+let panelPage = 1;
+const PANEL_PAGE_SIZE = 20;
 
 // ═══════════════════════════════════════════
 // Sample PRD
@@ -890,7 +1198,7 @@ const sampleTestCases = [
 // ═══════════════════════════════════════════
 function init() {
   renderWelcome();
-  renderSidebar();
+  renderHistory();
 
   // textarea auto-resize & shortcuts
   const ta = document.getElementById('inputArea');
@@ -939,8 +1247,8 @@ function renderWelcome() {
     </div>`;
 }
 
-function renderSidebar() {
-  const list = document.getElementById('sidebarList');
+function renderHistory() {
+  const list = document.getElementById('historyList');
   if (conversations.length === 0) {
     list.innerHTML = `<div style="padding:20px 12px;text-align:center;color:var(--text-tertiary);font-size:0.8rem;">暂无对话记录</div>`;
     return;
@@ -956,16 +1264,25 @@ function renderSidebar() {
 // ═══════════════════════════════════════════
 // Actions
 // ═══════════════════════════════════════════
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
+function toggleHistory() {
+  const panel = document.getElementById('historyPanel');
+  const btn = document.getElementById('historyToggleBtn');
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    panel.classList.toggle('open');
+  } else {
+    const willCollapse = !panel.classList.contains('collapsed');
+    panel.classList.toggle('collapsed');
+    btn.textContent = willCollapse ? '<' : '>';
+  }
 }
 
 function newConversation() {
   currentConvId = null;
   renderWelcome();
-  renderSidebar();
+  renderHistory();
   document.getElementById('headerTitle').textContent = '新的测试用例';
-  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('historyPanel').classList.remove('open');
 }
 
 function switchConv(id) {
@@ -974,9 +1291,11 @@ function switchConv(id) {
   if (conv) {
     document.getElementById('headerTitle').textContent = conv.title;
     renderMessages(conv.messages);
+    lastGeneratedCases = conv.cases || [];
   }
-  renderSidebar();
-  document.getElementById('sidebar').classList.remove('open');
+  renderHistory();
+  document.getElementById('historyPanel').classList.remove('open');
+  switchView('chat');
 }
 
 function renderMessages(msgs) {
@@ -1019,12 +1338,13 @@ async function handleSend() {
       title,
       time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
       caseCount: result.cases.length,
+      cases: result.cases,
       messages: [
         { html: `<div class="msg msg-user"><div class="msg-bubble">${escapeHtml(text)}</div></div>` },
         { html: resultsHTML },
       ],
     });
-    renderSidebar();
+    renderHistory();
   } catch (err) {
     inner.innerHTML += `
       <div class="msg msg-assistant" style="animation:msgIn 0.4s ease">
@@ -1207,6 +1527,10 @@ function renderRealResults(analysis, cases, review) {
           <div class="summary-card-label">覆盖率</div>
           <div class="summary-card-value text-success">${coverageScore}%</div>
         </div>
+        <div class="summary-card" style="cursor:pointer" onclick="switchView('cases')">
+          <div class="summary-card-label">查看详情</div>
+          <div class="summary-card-value" style="font-size:0.95rem;color:var(--accent)">查看用例 →</div>
+        </div>
       </div>
 
       <div class="coverage-bar-wrap">
@@ -1247,9 +1571,8 @@ function renderRealResults(analysis, cases, review) {
 
   html += `
       <div style="margin-top:16px;display:flex;gap:8px;">
-        <button class="btn-new" onclick="exportResult('markdown')">📄 导出 Markdown</button>
-        <button class="btn-new" onclick="exportResult('json')">📦 导出 JSON</button>
-        <button class="btn-new" onclick="exportResult('table')">📊 复制表格</button>
+        <button class="btn-new" onclick="switchView('cases')">📊 查看用例</button>
+        <button class="btn-new" onclick="downloadMarkdown()">📄 下载 Markdown</button>
       </div>
     </div>
   </div>`;
@@ -1263,6 +1586,11 @@ function renderRealResults(analysis, cases, review) {
 function escapeHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function escapeHtmlPlain(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function scrollToBottom() {
@@ -1283,34 +1611,295 @@ function showToast(msg) {
   setTimeout(() => t.remove(), 2000);
 }
 
-function exportResult(format) {
-  const cases = lastGeneratedCases;
-  let text = '';
-  if (format === 'json') {
-    text = JSON.stringify(cases, null, 2);
-  } else if (format === 'markdown') {
-    text = '# 测试用例报告\n\n';
-    const modules = [...new Set(cases.map(c => c.module))];
-    for (const mod of modules) {
-      const modCases = cases.filter(c => c.module === mod);
-      text += `## ${mod}\n\n| 编号 | 标题 | 类型 | 优先级 | 前置条件 | 预期结果 |\n|------|------|------|--------|----------|----------|\n`;
-      for (const c of modCases) {
-        text += `| ${c.id} | ${c.title} | ${c.caseType || c.type} | ${c.priority} | ${c.precondition || c.pre} | ${c.expected} |\n`;
-      }
-      text += '\n';
-    }
+// ═══════════════════════════════════════════
+// View Switching — 对话 / 用例面板
+// ═══════════════════════════════════════════
+function switchView(view) {
+  currentView = view;
+  const casesView = document.getElementById('casesView');
+  const messages = document.getElementById('messages');
+  const composer = document.querySelector('.composer-wrap');
+  const historyPanel = document.getElementById('historyPanel');
+  const toggleBtn = document.getElementById('historyToggleBtn');
+
+  // Update activity bar nav
+  document.querySelectorAll('.activity-item[data-view]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === view);
+  });
+
+  if (view === 'cases') {
+    casesView.classList.add('active');
+    messages.style.display = 'none';
+    composer.style.display = 'none';
+    historyPanel.style.display = 'none';
+    toggleBtn.style.display = 'none';
+    document.getElementById('headerTitle').textContent = '测试用例面板';
+    renderCasesView();
   } else {
-    text = cases.map(c =>
-      `${c.id}\t${c.module}\t${c.title}\t${c.caseType || c.type}\t${c.priority}\t${c.precondition || c.pre}\t${c.expected}`
-    ).join('\n');
+    casesView.classList.remove('active');
+    messages.style.display = '';
+    composer.style.display = '';
+    historyPanel.style.display = '';
+    toggleBtn.style.display = '';
+    // Sync button text with panel state
+    toggleBtn.textContent = historyPanel.classList.contains('collapsed') ? '<' : '>';
+    const conv = conversations.find(c => c.id === currentConvId);
+    document.getElementById('headerTitle').textContent = conv ? conv.title : '新的测试用例';
+  }
+}
+
+// ═══════════════════════════════════════════
+// Cases View — Tab Switching
+// ═══════════════════════════════════════════
+// Cases View — Filter / Sort / Paginate
+// ═══════════════════════════════════════════
+function getFilteredCases() {
+  let cases = [...lastGeneratedCases];
+  if (panelFilters.module) {
+    cases = cases.filter(c => c.module === panelFilters.module);
+  }
+  if (panelFilters.priority) {
+    cases = cases.filter(c => c.priority === panelFilters.priority);
+  }
+  if (panelFilters.type) {
+    cases = cases.filter(c => (c.caseType || c.type) === panelFilters.type);
+  }
+  cases.sort((a, b) => {
+    let va = a[panelSort.key] || '';
+    let vb = b[panelSort.key] || '';
+    if (panelSort.key === 'caseType') { va = a.caseType || a.type || ''; vb = b.caseType || b.type || ''; }
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return panelSort.dir === 'asc' ? -1 : 1;
+    if (va > vb) return panelSort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  return cases;
+}
+
+function getPaginatedCases(filtered) {
+  const start = (panelPage - 1) * PANEL_PAGE_SIZE;
+  return filtered.slice(start, start + PANEL_PAGE_SIZE);
+}
+
+function onFilterChange(key, value) {
+  panelFilters[key] = value;
+  panelPage = 1;
+  renderCasesView();
+}
+
+function onSort(key) {
+  if (panelSort.key === key) {
+    panelSort.dir = panelSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    panelSort.key = key;
+    panelSort.dir = 'asc';
+  }
+  renderCasesView();
+}
+
+function goToPage(page) {
+  const totalPages = Math.max(1, Math.ceil(getFilteredCases().length / PANEL_PAGE_SIZE));
+  if (page < 1 || page > totalPages) return;
+  panelPage = page;
+  renderCasesView();
+}
+
+// ═══════════════════════════════════════════
+// Cases View — Render
+// ═══════════════════════════════════════════
+function renderCasesView() {
+  const filterBar = document.getElementById('casesFilterBar');
+  const content = document.getElementById('casesContent');
+
+  // Empty state
+  if (!lastGeneratedCases || lastGeneratedCases.length === 0) {
+    filterBar.style.display = 'none';
+    content.innerHTML = `
+      <div class="cases-empty">
+        <div class="cases-empty-icon">📋</div>
+        <div class="cases-empty-text">暂无测试用例</div>
+        <div style="font-size:0.78rem;color:var(--text-tertiary)">在 AI 对话中粘贴 PRD 文档生成测试用例</div>
+      </div>`;
+    return;
   }
 
-  navigator.clipboard.writeText(text).then(() => {
-    showToast(`已复制 ${format.toUpperCase()} 到剪贴板`);
-  }).catch(() => {
-    showToast('复制失败，请手动选择');
-  });
+  filterBar.style.display = '';
+  filterBar.innerHTML = renderCasesFilterBar();
+
+  const filtered = getFilteredCases();
+
+  content.innerHTML = renderCasesTableView(filtered);
 }
+
+function renderCasesFilterBar() {
+  const cases = lastGeneratedCases;
+  const modules = [...new Set(cases.map(c => c.module))];
+  const types = [...new Set(cases.map(c => c.caseType || c.type))];
+  const filtered = getFilteredCases();
+
+  return `
+    <select class="filter-select" onchange="onFilterChange('module', this.value)">
+      <option value="">全部模块</option>
+      ${modules.map(m => `<option value="${escapeHtmlPlain(m)}" ${panelFilters.module === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
+    </select>
+    <select class="filter-select" onchange="onFilterChange('priority', this.value)">
+      <option value="">全部优先级</option>
+      ${['P0','P1','P2','P3'].map(p => `<option value="${p}" ${panelFilters.priority === p ? 'selected' : ''}>${p}</option>`).join('')}
+    </select>
+    <select class="filter-select" onchange="onFilterChange('type', this.value)">
+      <option value="">全部类型</option>
+      ${types.map(t => `<option value="${escapeHtmlPlain(t)}" ${panelFilters.type === t ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}
+    </select>
+    <span class="filter-count">${filtered.length} / ${cases.length} 条</span>`;
+}
+
+function renderCasesTableView(filtered) {
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PANEL_PAGE_SIZE));
+  if (panelPage > totalPages) panelPage = totalPages;
+  const pageCases = getPaginatedCases(filtered);
+
+  const sortClass = (key) => `sortable ${panelSort.key === key ? panelSort.dir : ''}`;
+
+  let html = `<div class="cases-table-wrap"><table class="test-table">
+    <thead><tr>
+      <th class="${sortClass('id')}" onclick="onSort('id')">编号</th>
+      <th class="${sortClass('module')}" onclick="onSort('module')">模块</th>
+      <th class="${sortClass('title')}" onclick="onSort('title')">标题</th>
+      <th class="${sortClass('caseType')}" onclick="onSort('caseType')">类型</th>
+      <th class="${sortClass('priority')}" onclick="onSort('priority')">优先级</th>
+      <th>前置条件</th>
+      <th>预期结果</th>
+    </tr></thead><tbody>`;
+
+  for (const c of pageCases) {
+    const caseType = c.caseType || c.type || '';
+    html += `<tr>
+      <td class="cell-id">${escapeHtml(c.id)}</td>
+      <td>${escapeHtml(c.module)}</td>
+      <td class="cell-title">${escapeHtml(c.title)}</td>
+      <td><span class="tag tag-type">${escapeHtml(caseType)}</span></td>
+      <td><span class="tag tag-${c.priority}">${c.priority}</span></td>
+      <td>${escapeHtml(c.precondition || c.pre || '')}</td>
+      <td>${escapeHtml(c.expected)}</td>
+    </tr>`;
+  }
+
+  html += `</tbody></table></div>`;
+
+  if (totalPages > 1) {
+    html += renderPagination(total, totalPages);
+  }
+
+  return html;
+}
+
+function renderPagination(total, totalPages) {
+  const start = (panelPage - 1) * PANEL_PAGE_SIZE + 1;
+  const end = Math.min(panelPage * PANEL_PAGE_SIZE, total);
+
+  let html = `<div class="pagination">`;
+  html += `<button onclick="goToPage(${panelPage - 1})" ${panelPage === 1 ? 'disabled' : ''}>‹</button>`;
+
+  let startPage = Math.max(1, panelPage - 2);
+  let endPage = Math.min(totalPages, startPage + 4);
+  if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="${i === panelPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+  }
+
+  html += `<button onclick="goToPage(${panelPage + 1})" ${panelPage === totalPages ? 'disabled' : ''}>›</button>`;
+  html += `<span class="pagination-info">${start}-${end} / ${total}</span>`;
+  html += `</div>`;
+  return html;
+}
+
+
+
+
+
+// ═══════════════════════════════════════════
+// Downloads
+// ═══════════════════════════════════════════
+
+function generateMarkdown(cases) {
+  let text = '# \u6d4b\u8bd5\u7528\u4f8b\u62a5\u544a\n\n';
+  const modules = [...new Set(cases.map(c => c.module))];
+  for (const mod of modules) {
+    const modCases = cases.filter(c => c.module === mod);
+    text += '## ' + mod + '\n\n';
+    text += '| \u7f16\u53f7 | \u6807\u9898 | \u7c7b\u578b | \u4f18\u5148\u7ea7 | \u524d\u7f6e\u6761\u4ef6 | \u9884\u671f\u7ed3\u679c |\n';
+    text += '|------|------|------|--------|----------|----------|\n';
+    for (const tc of modCases) {
+      const ctype = tc.caseType || tc.type || "";
+      const pre = tc.precondition || tc.pre || "";
+      text += '| ' + tc.id + ' | ' + tc.title + ' | ' + ctype + ' | ' + tc.priority + ' | ' + pre + ' | ' + tc.expected + '|\n';
+    }
+    text += '\n';
+  }
+  return text;
+}
+
+
+function downloadMarkdown() {
+  const md = generateMarkdown(lastGeneratedCases);
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'test-cases.md';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Markdown 文件已下载');
+}
+
+function downloadXlsx() {
+  if (typeof XLSX === 'undefined') {
+    showToast('Excel 库加载中，请稍后重试');
+    return;
+  }
+  const cases = lastGeneratedCases;
+  const rows = cases.map(c => ({
+    '编号': c.id,
+    '模块': c.module,
+    '标题': c.title,
+    '类型': c.caseType || c.type || '',
+    '优先级': c.priority,
+    '前置条件': c.precondition || c.pre || '',
+    '操作步骤': Array.isArray(c.steps) ? c.steps.map((s, i) => `${i+1}. ${s}`).join('\n') : (c.steps || ''),
+    '预期结果': c.expected,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 10 },  // 编号
+    { wch: 14 },  // 模块
+    { wch: 32 },  // 标题
+    { wch: 10 },  // 类型
+    { wch: 10 },  // 优先级
+    { wch: 28 },  // 前置条件
+    { wch: 36 },  // 操作步骤
+    { wch: 28 },  // 预期结果
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '测试用例');
+  XLSX.writeFile(wb, 'test-cases.xlsx');
+  showToast('Excel 文件已下载');
+}
+
+
+
+// ═══════════════════════════════════════════
+// Keyboard shortcut — Escape switches to chat
+// ═══════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && currentView === 'cases') {
+    switchView('chat');
+  }
+});
 
 // Boot
 init();
